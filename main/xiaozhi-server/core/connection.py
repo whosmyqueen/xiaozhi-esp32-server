@@ -116,6 +116,27 @@ class ConnectionHandler:
         try:
             # 获取并验证headers
             self.headers = dict(ws.request.headers)
+
+            if self.headers.get("device-id", None) is None:
+                # 尝试从 URL 的查询参数中获取 device-id
+                from urllib.parse import parse_qs, urlparse
+
+                # 从 WebSocket 请求中获取路径
+                request_path = ws.request.path
+                if not request_path:
+                    self.logger.bind(tag=TAG).error("无法获取请求路径")
+                    return
+                parsed_url = urlparse(request_path)
+                query_params = parse_qs(parsed_url.query)
+                if "device-id" in query_params:
+                    self.headers["device-id"] = query_params["device-id"][0]
+                    self.headers["client-id"] = query_params["client-id"][0]
+                else:
+                    self.logger.bind(tag=TAG).error(
+                        "无法从请求头和URL查询参数中获取device-id"
+                    )
+                    return
+
             # 获取客户端ip地址
             self.client_ip = ws.remote_address[0]
             self.logger.bind(tag=TAG).info(
@@ -184,7 +205,6 @@ class ConnectionHandler:
         self._initialize_models()
 
         """加载提示词"""
-        self.prompt = self.config["prompt"]
         self.dialogue.put(Message(role="system", content=self.prompt))
 
         """加载记忆"""
@@ -269,8 +289,6 @@ class ConnectionHandler:
             self.config["selected_module"]["Intent"] = private_config[
                 "selected_module"
             ]["Intent"]
-        if private_config.get("prompt", None) is not None:
-            self.config["prompt"] = private_config["prompt"]
         try:
             modules = initialize_modules(
                 self.logger,
@@ -285,6 +303,10 @@ class ConnectionHandler:
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"初始化组件失败: {e}")
             modules = {}
+        if modules.get("vad", None) is not None:
+            self.vad = modules["vad"]
+        if modules.get("asr", None) is not None:
+            self.asr = modules["asr"]
         if modules.get("tts", None) is not None:
             self.tts = modules["tts"]
         if modules.get("llm", None) is not None:
@@ -293,6 +315,8 @@ class ConnectionHandler:
             self.intent = modules["intent"]
         if modules.get("memory", None) is not None:
             self.memory = modules["memory"]
+        if modules.get("prompt", None) is not None:
+            self.change_system_prompt(modules["prompt"])
 
     def _initialize_memory(self):
         """初始化记忆模块"""

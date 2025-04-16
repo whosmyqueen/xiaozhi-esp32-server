@@ -15,9 +15,12 @@
       <div class="content-panel">
         <div class="content-area">
           <el-card class="user-card" shadow="never">
-            <el-table ref="userTable" :data="userList" class="transparent-table"
-              :header-cell-class-name="headerCellClassName">
-              <el-table-column label="选择" type="selection" align="center" width="120"></el-table-column>
+            <el-table ref="userTable" :data="userList" class="transparent-table">
+              <el-table-column label="选择" align="center" width="120">
+                  <template slot-scope="scope">
+                      <el-checkbox v-model="scope.row.selected"></el-checkbox>
+                  </template>
+              </el-table-column>
               <el-table-column label="用户Id" prop="userid" align="center"></el-table-column>
               <el-table-column label="手机号码" prop="mobile" align="center"></el-table-column>
               <el-table-column label="设备数量" prop="deviceCount" align="center"></el-table-column>
@@ -96,9 +99,9 @@ export default {
       currentPassword: "",
       searchPhone: "",
       userList: [],
-      pageSizeOptions: [5, 10, 20, 50, 100],
+      pageSizeOptions: [10, 20, 50, 100],
       currentPage: 1,
-      pageSize: 5,
+      pageSize: 10,
       total: 0,
       isAllSelected: false
     };
@@ -134,34 +137,35 @@ export default {
     },
 
     fetchUsers() {
-      Api.admin.getUserList(
-        {
-          page: this.currentPage,
-          limit: this.pageSize,
-          mobile: this.searchPhone,
-        },
-        ({ data }) => {
-          if (data.code === 0) {
-            this.userList = data.data.list
-            this.total = data.data.total;
-          }
-        }
-      );
+        Api.admin.getUserList(
+            {
+                page: this.currentPage,
+                limit: this.pageSize,
+                mobile: this.searchPhone,
+            },
+            ({ data }) => {
+                if (data.code === 0) {
+                    this.userList = data.data.list.map(item => ({
+                        ...item,
+                        selected: false
+                    }));
+                    this.total = data.data.total;
+                }
+            }
+        );
     },
     handleSearch() {
       this.currentPage = 1;
       this.fetchUsers();
     },
     handleSelectAll() {
-      if (this.isAllSelected) {
-        this.$refs.userTable.clearSelection();
-      } else {
-        this.$refs.userTable.toggleAllSelection();
-      }
-      this.isAllSelected = !this.isAllSelected;
+        this.isAllSelected = !this.isAllSelected;
+        this.userList.forEach(row => {
+            row.selected = this.isAllSelected;
+        });
     },
     batchDelete() {
-      const selectedUsers = this.$refs.userTable.selection;
+      const selectedUsers = this.userList.filter(user => user.selected);
       if (selectedUsers.length === 0) {
         this.$message.warning("请先选择需要删除的用户");
         return;
@@ -226,20 +230,12 @@ export default {
         });
     },
     batchEnable() {
-      const selectedUsers = this.$refs.userTable.selection;
-      if (selectedUsers.length === 0) {
-        this.$message.warning("请先选择需要启用的用户");
-        return;
-      }
-      this.handleChangeStatus(selectedUsers, 1);
+        const selectedUsers = this.userList.filter(user => user.selected);
+        this.handleChangeStatus(selectedUsers, 1);
     },
     batchDisable() {
-      const selectedUsers = this.$refs.userTable.selection;
-      if (selectedUsers.length === 0) {
-        this.$message.warning("请先选择需要禁用的用户");
-        return;
-      }
-      this.handleChangeStatus(selectedUsers, 0);
+        const selectedUsers = this.userList.filter(user => user.selected);
+        this.handleChangeStatus(selectedUsers, 0);
     },
     resetPassword(row) {
       this.$confirm("重置后将会生成新密码，是否继续？", "提示", {
@@ -281,12 +277,6 @@ export default {
           });
         })
         .catch(() => { });
-    },
-    headerCellClassName({ columnIndex }) {
-      if (columnIndex === 0) {
-        return "custom-selection-header";
-      }
-      return "";
     },
     goFirst() {
       this.currentPage = 1;
@@ -365,7 +355,7 @@ export default {
 .main-wrapper {
   margin: 5px 22px;
   border-radius: 15px;
-  min-height: calc(100vh - 350px);
+  min-height: calc(100vh - 24vh);
   height: auto;
   max-height: 80vh;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
@@ -567,7 +557,7 @@ export default {
   flex-direction: column;
   .el-table__body-wrapper {
     flex: 1;
-    overflow: auto;
+    overflow-y: auto;
     max-height: none !important;
   }
 
@@ -602,19 +592,6 @@ export default {
   color: #5a64b5 !important;
 }
 
-:deep(.custom-selection-header) {
-  .el-checkbox {
-    display: none !important;
-  }
-
-  &::after {
-    content: "选择";
-    display: inline-block;
-    color: black;
-    font-weight: bold;
-    padding-bottom: 18px;
-  }
-}
 
 :deep(.el-checkbox__inner) {
   background-color: #eeeeee !important;
@@ -697,7 +674,7 @@ export default {
 }
 
 .el-table {
-  --table-max-height: calc(100vh - 400px);
+  --table-max-height: calc(100vh - 40vh);
   max-height: var(--table-max-height);
 
   .el-table__body-wrapper {
