@@ -42,9 +42,10 @@ class TTSException(RuntimeError):
 
 class ConnectionHandler:
     def __init__(
-        self, config: Dict[str, Any], _vad, _asr, _llm, _tts, _memory, _intent
+        self, config: Dict[str, Any], _vad, _asr, _llm, _tts, _memory, _intent, server=None
     ):
-        self.config = copy.deepcopy(config)
+        self.config = config
+        self.server = server
         self.logger = setup_logging()
         self.auth = AuthMiddleware(config)
 
@@ -202,12 +203,16 @@ class ConnectionHandler:
         finally:
             await self.close(ws)
 
+    async def reset_timeout(self):
+        """重置超时计时器"""
+        if self.timeout_task:
+            self.timeout_task.cancel()
+        self.timeout_task = asyncio.create_task(self._check_timeout())
+
     async def _route_message(self, message):
         """消息路由"""
         # 重置超时计时器
-        if self.timeout_task:
-            self.timeout_task.cancel()
-            self.timeout_task = asyncio.create_task(self._check_timeout())
+        await self.reset_timeout()
 
         if isinstance(message, str):
             await handleTextMessage(self, message)
@@ -255,6 +260,12 @@ class ConnectionHandler:
             # 标记需要重新初始化的模块
             if config_model in ["llm", "tts", "asr", "vad", "intent", "memory"]:
                 updated_modules.append(config_model)
+
+        # 同步更新 WebSocketServer 的配置
+        if self.server:
+            async with self.server.config_lock:  # 使用锁确保线程安全
+                for config_model in updated_modules:
+                    self.server.config[config_model].update(new_config[config_model])
 
         # 批量初始化模块
         if updated_modules:
