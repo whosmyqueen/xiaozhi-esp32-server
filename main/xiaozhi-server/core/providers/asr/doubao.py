@@ -88,6 +88,8 @@ class ASRProvider(ASRProviderBase):
         self.appid = config.get("appid")
         self.cluster = config.get("cluster")
         self.access_token = config.get("access_token")
+        self.boosting_table_name = config.get("boosting_table_name")
+        self.correct_table_name = config.get("correct_table_name")
         self.output_dir = config.get("output_dir")
         self.delete_audio_file = delete_audio_file
 
@@ -101,7 +103,8 @@ class ASRProvider(ASRProviderBase):
 
     def save_audio_to_file(self, pcm_data: List[bytes], session_id: str) -> str:
         """PCM数据保存为WAV文件"""
-        file_name = f"asr_{session_id}_{uuid.uuid4()}.wav"
+        module_name = __name__.split(".")[-1]
+        file_name = f"asr_{module_name}_{session_id}_{uuid.uuid4()}.wav"
         file_path = os.path.join(self.output_dir, file_name)
 
         with wave.open(file_path, "wb") as wf:
@@ -136,7 +139,13 @@ class ASRProvider(ASRProviderBase):
             "user": {
                 "uid": str(uuid.uuid4()),
             },
-            "request": {"reqid": reqid, "show_utterances": False, "sequence": 1},
+            "request": {
+                "reqid": reqid,
+                "show_utterances": False,
+                "sequence": 1,
+                "boosting_table_name": self.boosting_table_name,
+                "correct_table_name": self.correct_table_name,
+            },
             "audio": {
                 "format": "raw",
                 "rate": 16000,
@@ -233,14 +242,6 @@ class ASRProvider(ASRProviderBase):
         return pcm_data
 
     @staticmethod
-    def read_wav_info(data: io.BytesIO = None) -> (int, int, int, int, int):
-        with io.BytesIO(data) as _f:
-            wave_fp = wave.open(_f, "rb")
-            nchannels, sampwidth, framerate, nframes = wave_fp.getparams()[:4]
-            wave_bytes = wave_fp.readframes(nframes)
-        return nchannels, sampwidth, framerate, nframes, len(wave_bytes)
-
-    @staticmethod
     def slice_data(data: bytes, chunk_size: int) -> (list, bool):
         """
         slice data
@@ -260,6 +261,8 @@ class ASRProvider(ASRProviderBase):
         self, opus_data: List[bytes], session_id: str
     ) -> Tuple[Optional[str], Optional[str]]:
         """将语音数据转换为文本"""
+
+        file_path = None
         try:
             # 合并所有opus数据包
             pcm_data = self.decode_opus(opus_data, session_id)
@@ -269,7 +272,7 @@ class ASRProvider(ASRProviderBase):
             if self.delete_audio_file:
                 pass
             else:
-                self.save_audio_to_file(pcm_data, session_id)
+                file_path = self.save_audio_to_file(pcm_data, session_id)
 
             # 直接使用PCM数据
             # 计算分段大小 (单声道, 16bit, 16kHz采样率)
@@ -283,9 +286,9 @@ class ASRProvider(ASRProviderBase):
                 logger.bind(tag=TAG).debug(
                     f"语音识别耗时: {time.time() - start_time:.3f}s | 结果: {text}"
                 )
-                return text, None
-            return "", None
+                return text, file_path
+            return "", file_path
 
         except Exception as e:
             logger.bind(tag=TAG).error(f"语音识别失败: {e}", exc_info=True)
-            return "", None
+            return "", file_path

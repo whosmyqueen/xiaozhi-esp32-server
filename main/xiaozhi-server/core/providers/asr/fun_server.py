@@ -2,8 +2,11 @@ import re
 from typing import Optional, Tuple, List
 import opuslib_next
 from core.providers.asr.base import ASRProviderBase
+import os
 import ssl
 import json
+import uuid
+import wave
 import websockets
 from config.logger import setup_logging
 import asyncio
@@ -23,6 +26,7 @@ class ASRProvider(ASRProviderBase):
         self.port = config.get('port', 10095)
         self.api_key = config.get('api_key', 'none')
         self.is_ssl = config.get('is_ssl', True)
+        self.output_dir = config.get("output_dir")
         self.delete_audio_file = delete_audio_file
         self.uri = f"wss://{self.host}:{self.port}" if self.is_ssl else f"ws://{self.host}:{self.port}"
         self.ssl_context = ssl.SSLContext() if self.is_ssl else None
@@ -30,9 +34,19 @@ class ASRProvider(ASRProviderBase):
             self.ssl_context.check_hostname = False
             self.ssl_context.verify_mode = ssl.CERT_NONE
 
-    def save_audio_to_file(self, opus_data: List[bytes], session_id: str) -> str:
-        """解码Opus数据并保存为WAV文件"""
-        pass
+    def save_audio_to_file(self, pcm_data: List[bytes], session_id: str) -> str:
+        """PCM数据保存为WAV文件"""
+        module_name = __name__.split(".")[-1]
+        file_name = f"asr_{module_name}_{session_id}_{uuid.uuid4()}.wav"
+        file_path = os.path.join(self.output_dir, file_name)
+
+        with wave.open(file_path, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)  # 2 bytes = 16-bit
+            wf.setframerate(16000)
+            wf.writeframes(b"".join(pcm_data))
+
+        return file_path
 
     @staticmethod
     def decode_opus(opus_data: List[bytes]) -> bytes:
@@ -46,6 +60,9 @@ class ASRProvider(ASRProviderBase):
                 pcm_data.append(pcm_frame)
             except opuslib_next.OpusError as e:
                 logger.bind(tag=TAG).error(f"Opus解码错误: {e}", exc_info=True)
+
+        return pcm_data
+
 
         return b"".join(pcm_data)
 
@@ -103,6 +120,7 @@ class ASRProvider(ASRProviderBase):
         await ws.send(end_message)
         logger.bind(tag=TAG).debug(f"Sent end message: {end_message}")
 
+
     async def speech_to_text(self, opus_data: List[bytes], session_id: str) -> Tuple[Optional[str], Optional[str]]:
         '''
         Convert speech data to text using FunASR.
@@ -110,14 +128,21 @@ class ASRProvider(ASRProviderBase):
         :param session_id: Unique session identifier.
         :return: Tuple containing recognized text and optional timestamp.
         '''
-
+        file_path = None
         pcm_data = self.decode_opus(opus_data)
+        combined_pcm_data = b"".join(pcm_data)
+
+        # 判断是否保存为WAV文件
+        if self.delete_audio_file:
+            pass
+        else:
+            file_path = self.save_audio_to_file(pcm_data, session_id)
         auth_header = {'Authorization': 'Bearer; {}'.format(self.api_key)}
         async with websockets.connect(self.uri, additional_headers=auth_header, subprotocols=["binary"], ping_interval=None,
                                       ssl=self.ssl_context) as ws:
             try:
                 # Use asyncio to handle WebSocket communication
-                send_task = asyncio.create_task(self._send_data(ws, pcm_data, session_id))
+                send_task = asyncio.create_task(self._send_data(ws, combined_pcm_data, session_id))
                 receive_task = asyncio.create_task(self._receive_responses(ws))
 
                 # Gather tasks with error handling
@@ -140,11 +165,11 @@ class ASRProvider(ASRProviderBase):
                 match = re.match(r'<\|(.*?)\|><\|(.*?)\|><\|(.*?)\|>(.*)', result)
                 if match:
                     result = match.group(4).strip()
-                return result, None  # Return the recognized text and timestamp (if any)
+                return result, file_path  # Return the recognized text and timestamp (if any)
 
             except websockets.exceptions.ConnectionClosed as e:
                 logger.bind(tag=TAG).error(f"WebSocket connection closed: {e}")
-                return "", None
+                return "", file_path
             except Exception as e:
                 logger.bind(tag=TAG).error(f"Error during speech-to-text conversion: {e}", exc_info=True)
-                return "", None
+                return "", file_path
