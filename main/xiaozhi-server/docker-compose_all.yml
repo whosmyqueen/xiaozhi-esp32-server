@@ -52,7 +52,7 @@ services:
       - ./uploadfile:/uploadfile
 
   xiaozhi-esp32-server-db:
-    image: mysql:8.4.5
+    image: mysql:latest
     container_name: xiaozhi-esp32-server-db
     healthcheck:
       test: [ "CMD", "mysqladmin" ,"ping", "-h", "localhost" ]
@@ -72,7 +72,7 @@ services:
       - MYSQL_DATABASE=xiaozhi_esp32_server
       - MYSQL_INITDB_ARGS="--character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci"
   xiaozhi-esp32-server-redis:
-    image: redis
+    image: redis:latest
     expose:
       - 6379
     container_name: xiaozhi-esp32-server-redis
