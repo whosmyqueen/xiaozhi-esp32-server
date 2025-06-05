@@ -53,6 +53,7 @@ class VLLMProvider(VLLMProviderBase):
                     ],
                 }
             ]
+            logger.bind(tag=TAG).info(f"base64_image: {base64_image}")
 
             response = self.client.chat.completions.create(
                 model=self.model_name, messages=messages, stream=False
