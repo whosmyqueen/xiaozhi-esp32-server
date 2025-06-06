@@ -4,7 +4,7 @@ version: '3'
 services:
   # Server模块
   senseflow-esp32-server:
-    image: registry.cn-sh-01.sensecore.cn/lm4science-ccr/senseflow-esp32-server:web_last
+    image: registry.cn-sh-01.sensecore.cn/lm4science-ccr/senseflow-esp32-server:server_last
     container_name: senseflow-esp32-server
     depends_on:
       - senseflow-esp32-server-db
@@ -29,7 +29,7 @@ services:
 
   # manager-api和manager-web模块
   senseflow-esp32-server-web:
-    image: registry.cn-sh-01.sensecore.cn/lm4science-ccr/senseflow-esp32-server:server_last
+    image: registry.cn-sh-01.sensecore.cn/lm4science-ccr/senseflow-esp32-server:web_last
     container_name: senseflow-esp32-server-web
     restart: always
     networks:
