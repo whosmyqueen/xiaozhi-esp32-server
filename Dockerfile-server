@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt -i https://mirrors.tuna.tsing
 # 第二阶段：生产镜像
 FROM python:3.10-slim
 
-WORKDIR /home/xiaozhi-esp32-server
+WORKDIR /home/senseflow-esp32-server
 
 # if you located in China, you can use aliyun mirror to speed up
 RUN sed -i 's@deb.debian.org@mirrors.tuna.tsinghua.edu.cn@g' /etc/apt/sources.list.d/debian.sources

@@ -3,12 +3,12 @@
 version: '3'
 services:
   # Server模块
-  xiaozhi-esp32-server:
-    image: ghcr.nju.edu.cn/xinnan-tech/xiaozhi-esp32-server:server_latest
-    container_name: xiaozhi-esp32-server
+  senseflow-esp32-server:
+    image: registry.cn-sh-01.sensecore.cn/lm4science-ccr/senseflow-esp32-server:web_last
+    container_name: senseflow-esp32-server
     depends_on:
-      - xiaozhi-esp32-server-db
-      - xiaozhi-esp32-server-redis
+      - senseflow-esp32-server-db
+      - senseflow-esp32-server-redis
     restart: always
     networks:
       - default
@@ -23,39 +23,39 @@ services:
       - TZ=Asia/Shanghai
     volumes:
       # 配置文件目录
-      - ./data:/opt/xiaozhi-esp32-server/data
+      - ./data:/home/senseflow-esp32-server/data
       # 模型文件挂接，很重要
-      - ./models/SenseVoiceSmall/model.pt:/opt/xiaozhi-esp32-server/models/SenseVoiceSmall/model.pt
+      - ./models/SenseVoiceSmall/model.pt:/opt/senseflow-esp32-server/models/SenseVoiceSmall/model.pt
 
   # manager-api和manager-web模块
-  xiaozhi-esp32-server-web:
-    image: ghcr.nju.edu.cn/xinnan-tech/xiaozhi-esp32-server:web_latest
-    container_name: xiaozhi-esp32-server-web
+  senseflow-esp32-server-web:
+    image: registry.cn-sh-01.sensecore.cn/lm4science-ccr/senseflow-esp32-server:server_last
+    container_name: senseflow-esp32-server-web
     restart: always
     networks:
       - default
     depends_on:
-      xiaozhi-esp32-server-db:
+      senseflow-esp32-server-db:
         condition: service_healthy
-      xiaozhi-esp32-server-redis:
+      senseflow-esp32-server-redis:
         condition: service_healthy
     ports:
       # 智控台
       - "8002:8002"
     environment:
       - TZ=Asia/Shanghai
-      - SPRING_DATASOURCE_DRUID_URL=jdbc:mysql://xiaozhi-esp32-server-db:3306/xiaozhi_esp32_server?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&nullCatalogMeansCurrent=true&connectTimeout=30000&socketTimeout=30000&autoReconnect=true&failOverReadOnly=false&maxReconnects=10
+      - SPRING_DATASOURCE_DRUID_URL=jdbc:mysql://senseflow-esp32-server-db:3306/senseflow_esp32_server?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&nullCatalogMeansCurrent=true&connectTimeout=30000&socketTimeout=30000&autoReconnect=true&failOverReadOnly=false&maxReconnects=10
       - SPRING_DATASOURCE_DRUID_USERNAME=root
       - SPRING_DATASOURCE_DRUID_PASSWORD=123456
-      - SPRING_DATA_REDIS_HOST=xiaozhi-esp32-server-redis
+      - SPRING_DATA_REDIS_HOST=senseflow-esp32-server-redis
       - SPRING_DATA_REDIS_PORT=6379
     volumes:
       # 配置文件目录
       - ./uploadfile:/uploadfile
 
-  xiaozhi-esp32-server-db:
+  senseflow-esp32-server-db:
     image: mysql:latest
-    container_name: xiaozhi-esp32-server-db
+    container_name: senseflow-esp32-server-db
     healthcheck:
       test: [ "CMD", "mysqladmin" ,"ping", "-h", "localhost" ]
       timeout: 45s
@@ -71,13 +71,13 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - MYSQL_ROOT_PASSWORD=123456
-      - MYSQL_DATABASE=xiaozhi_esp32_server
+      - MYSQL_DATABASE=senseflow_esp32_server
       - MYSQL_INITDB_ARGS="--character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci"
-  xiaozhi-esp32-server-redis:
+  senseflow-esp32-server-redis:
     image: redis
     expose:
       - 6379
-    container_name: xiaozhi-esp32-server-redis
+    container_name: senseflow-esp32-server-redis
     restart: always
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
