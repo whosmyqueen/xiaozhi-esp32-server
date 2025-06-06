@@ -6,7 +6,7 @@ WORKDIR /app
 COPY main/xiaozhi-server/requirements.txt .
 
 # 安装Python依赖
-RUN pip install --no-cache-dir -r requirements.txt -i  https://mirrors.aliyun.com/pypi/simple/
+RUN pip install --no-cache-dir -r requirements.txt -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
 
 # 第二阶段：生产镜像
 FROM python:3.10-slim
@@ -14,7 +14,7 @@ FROM python:3.10-slim
 WORKDIR /home/xiaozhi-esp32-server
 
 # if you located in China, you can use aliyun mirror to speed up
-RUN sed -i 's@deb.debian.org@mirrors.aliyun.com@g' /etc/apt/sources.list.d/debian.sources
+RUN sed -i 's@deb.debian.org@mirrors.tuna.tsinghua.edu.cn@g' /etc/apt/sources.list.d/debian.sources
 
 # 安装系统依赖
 RUN apt-get update && \
